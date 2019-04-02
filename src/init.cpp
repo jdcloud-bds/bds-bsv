@@ -8,6 +8,7 @@
 #endif
 
 #include "init.h"
+#include "inttypes.h"
 
 #include "addrman.h"
 #include "amount.h"
@@ -1104,6 +1105,14 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-invalidheaderfreq=<n>",
          strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
            DEFAULT_INVALID_HEADER_FREQUENCY)) ;
+    strUsage += HelpMessageOpt(
+            "-kafka", _("BitcoinSV support kafka"));
+    strUsage += HelpMessageOpt(
+            "-kafkaproxyhost=<ip>",_("Kafka proxy host"));
+    strUsage += HelpMessageOpt(
+            "-kafkaproxyport=<port>",_("Kafka proxy port"));
+    strUsage += HelpMessageOpt(
+            "-kafkatopic=<name>",("Kafka topic name"));
 
     /** COrphanTxns */
     strUsage += HelpMessageGroup(_("Orphan txns config :"));
@@ -1588,6 +1597,22 @@ bool AppInitParameterInteraction(Config &config) {
                                          DEFAULT_BLOCK_PRIORITY_PERCENTAGE);
     if (std::string err; !config.SetBlockPriorityPercentage(blkprio, &err)) {
         return InitError(err);
+    }
+
+// -kafkabroker and -kafkatopic can not be empty when kafka enable
+    if (gArgs.IsArgSet("-kafka")) {
+        size_t kafkaProxyHost = gArgs.GetArgs("-kafkaproxyhost").size();
+        size_t kafkaProxyPort = gArgs.GetArgs("-kafkaproxyport").size();
+        size_t kafkaTopic = gArgs.GetArgs("-kafkatopic").size();
+        if (kafkaProxyHost == 0) {
+            return InitError("Kafka proxy host cannot be empty when kafka enable.");
+        }
+        if (kafkaProxyPort == 0) {
+            return InitError("Kafka proxy port cannot be empty when kafka enable.");
+        }
+        if (kafkaTopic == 0) {
+            return InitError("Kafka topic cannot be empty when kafka enable.");
+        }
     }
 
     // Make sure enough file descriptors are available

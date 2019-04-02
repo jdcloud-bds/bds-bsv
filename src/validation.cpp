@@ -5,6 +5,14 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "validation.h"
+#include <iostream>
+#include <rpc/blockchain.h>
+#include <script/standard.h>
+#include <script/interpreter.h>
+#include <pubkey.h>
+#include <key.h>
+#include <dstencode.h>
+
 
 #include "arith_uint256.h"
 #include "async_file_reader.h"
@@ -16,6 +24,7 @@
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
+#include "core_io.h"
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
@@ -48,6 +57,7 @@
 #include "versionbits.h"
 #include "warnings.h"
 #include "blockfileinfostore.h"
+#include "rpc/jsonwriter.h"
 
 #include <atomic>
 #include <sstream>
@@ -58,6 +68,7 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
+#include <boost/asio.hpp>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -5668,6 +5679,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     }
 
     NotifyHeaderTip();
+    static int kafkaHeightrRange = chainActive.Height() + 1;
 
     auto bestChainActivation =
         [&config, pblock, guard, token]
@@ -5690,7 +5702,9 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
 
             return true;
         };
-
+    if (gArgs.IsArgSet("-kafka")) {
+        myPrintBlockOrderByHeight(kafkaHeightrRange, config);
+    }
     return bestChainActivation;
 }
 
@@ -7112,3 +7126,185 @@ public:
         mapBlockIndex.clear();
     }
 } instance_of_cmaincleanup;
+
+
+const std::map<unsigned char, std::string> mapSigHashTypes = {
+        {static_cast<unsigned char>(SIGHASH_ALL), std::string("ALL")},
+        {static_cast<unsigned char>(SIGHASH_ALL|SIGHASH_ANYONECANPAY), std::string("ALL|ANYONECANPAY")},
+        {static_cast<unsigned char>(SIGHASH_NONE), std::string("NONE")},
+        {static_cast<unsigned char>(SIGHASH_NONE|SIGHASH_ANYONECANPAY), std::string("NONE|ANYONECANPAY")},
+        {static_cast<unsigned char>(SIGHASH_SINGLE), std::string("SINGLE")},
+        {static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY), std::string("SINGLE|ANYONECANPAY")},
+};
+
+int post(const std::string &host, const std::string &port, const std::string &page, const std::string &data, std::string &response_data) {
+    try {
+        boost::asio::io_service io_service;
+        if(io_service.stopped())
+            io_service.reset();
+
+        boost::asio::ip::tcp::resolver resolver(io_service);
+        boost::asio::ip::tcp::resolver::query query(host, port);
+        boost::asio::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+
+        boost::asio::ip::tcp::socket socket(io_service);
+        boost::asio::connect(socket, endpoint_iterator);
+
+        // Form the request. We specify the "Connection: close" header so that the
+        // server will close the socket after transmitting the response. This will
+        // allow us to treat all data up until the EOF as the content.
+        boost::asio::streambuf request;
+        std::ostream request_stream(&request);
+        request_stream << "POST " << page << " HTTP/1.0\r\n";
+        request_stream << "Host: " << host << "\r\n";
+        request_stream << "Accept: application/vnd.kafka.v1+json, application/vnd.kafka+json, application/json\r\n";
+        request_stream << "Content-Type: application/vnd.kafka.json.v1+json\r\n";
+        request_stream << "Content-Length: " << data.length() << "\r\n";
+        request_stream << "Connection: close\r\n\r\n";
+        request_stream << data;
+
+        // Send the request.
+        boost::asio::write(socket, request);
+
+        // Read the response status line. The response streambuf will automatically
+        // grow to accommodate the entire line. The growth may be limited by passing
+        // a maximum size to the streambuf constructor.
+        boost::asio::streambuf response;
+        boost::asio::read_until(socket, response, "\r\n");
+
+        // Check that response is OK.
+        std::istream response_stream(&response);
+        std::string http_version;
+        response_stream >> http_version;
+        unsigned int status_code;
+        response_stream >> status_code;
+        std::string status_message;
+        std::getline(response_stream, status_message);
+        if (!response_stream || http_version.substr(0, 5) != "HTTP/") {
+            response_data = "Invalid response";
+            return -2;
+        }
+        // if (status_code != 200)
+        // {
+        //     response_data = "Response returned with status code != 200 " ;
+        //     return status_code;
+        // }
+
+        std::string header;
+        std::vector<std::string> headers;
+        while (std::getline(response_stream, header) && header != "\r")
+            headers.push_back(header);
+
+        boost::system::error_code error;
+        while (boost::asio::read(socket, response, boost::asio::transfer_at_least(1), error)) {}
+
+        if (response.size()) {
+            std::istream response_stream(&response);
+            std::istreambuf_iterator<char> eos;
+            response_data = std::string(std::istreambuf_iterator<char>(response_stream), eos);
+        }
+
+        if (error != boost::asio::error::eof) {
+            response_data = error.message();
+            return -3;
+        }
+    }
+    catch(std::exception& e) {
+        response_data = e.what();
+        return -4;
+    }
+    return 0;
+}
+
+
+UniValue myBlockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool txDetails,const Config &config) {
+    AssertLockHeld(cs_main);
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("hash", blockindex->GetBlockHash().GetHex());
+    result.pushKV("size", (int)::GetSerializeSize(block, PROTOCOL_VERSION));
+    result.pushKV("height", blockindex->nHeight);
+    result.pushKV("version", block.nVersion);
+    result.pushKV("merkle_root", block.hashMerkleRoot.GetHex());
+    UniValue txs(UniValue::VARR);
+    for(const auto &tx : block.vtx) {
+        if(txDetails) {
+
+            CStringWriter strWriter;
+            CJSONWriter jWriter(strWriter, false);
+            TxToJSON(*tx, uint256(), IsGenesisEnabled(config, blockindex->nHeight), 0, jWriter);
+            jWriter.flush();
+            UniValue objTx(UniValue::VOBJ);
+            objTx.read(strWriter.MoveOutString());
+
+            txs.push_back(objTx);
+        } else {
+            txs.push_back(tx->GetHash().GetHex());
+        }
+    }
+    result.pushKV("tx", txs);
+    result.pushKV("time", block.GetBlockTime());
+    result.pushKV("median_time", (int64_t)blockindex->GetMedianTimePast());
+    result.pushKV("nonce", (uint64_t)block.nNonce);
+    result.pushKV("bits", strprintf("%08x", block.nBits));
+    result.pushKV("difficulty", GetDifficulty(blockindex));
+    result.pushKV("chain_work", blockindex->nChainWork.GetHex());
+    if (blockindex->pprev)
+        result.pushKV("prev_hash", blockindex->pprev->GetBlockHash().GetHex());
+    return result;
+}
+
+UniValue myGetBlock(const int height, const Config &config) {
+    UniValue result(UniValue::VOBJ);
+    if (height < 0 || height > chainActive.Height()){
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+    }
+    CBlockIndex *pblockindex = chainActive[height];
+    const CBlock block = myGetBlockChecked(pblockindex, config);
+    result = myBlockToJSON(block,pblockindex,true, config);
+    return result;
+}
+
+std::vector<UniValue> myGetBlockbatch(const int heightStart, const int heightEnd, const Config &config) {
+    std::vector<UniValue> result;
+    if (heightStart < 0 || heightEnd > chainActive.Height() || heightStart < heightEnd || heightEnd - heightStart > 1000) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+    }
+    for (int i = heightStart; i <= heightEnd; i++) {
+        CBlockIndex *pblockindex = chainActive[i];
+        const CBlock block = myGetBlockChecked(pblockindex, config);
+        result.push_back(myBlockToJSON(block, pblockindex, true, config));
+    }
+    return result;
+}
+
+CBlock myGetBlockChecked(const CBlockIndex *pblockindex, const Config &config) {
+    CBlock block;
+    if (fHavePruned && !pblockindex->nStatus.hasData() && pblockindex->nTx > 0) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
+    }
+
+    if (!ReadBlockFromDisk(block, pblockindex, config)) {
+        // Block not found on disk. This could be because we have the block
+        // header in our index but don't have the block (for example if a
+        // non-whitelisted node sends us an unrequested long chain of valid
+        // blocks, we add the headers to our index, but don't accept the
+        // block).
+        throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
+    }
+
+    return block;
+}
+
+void myPrintBlockOrderByHeight(int &kafkaHeightRange, const Config &config) {
+    if (kafkaHeightRange <= chainActive.Height()) {
+        for (int i = kafkaHeightRange; i <= chainActive.Height(); i++) {
+            std::string response_data;
+            int ret = post(gArgs.GetArg("-kafkaproxyhost", "localhost"), gArgs.GetArg("-kafkaproxyport", "8082"), "/topics/" + gArgs.GetArg("-kafkatopic", "bsv_test"), "{\"records\":[{\"value\":" + myGetBlock(i, config).write() + "}]}", response_data);
+            if (ret != 0) {
+                std::cout << "error_code:" << ret << std::endl;
+                std::cout << "error_message:" << response_data << std::endl;
+            }
+        }
+        kafkaHeightRange = chainActive.Height()+1;
+    }
+}

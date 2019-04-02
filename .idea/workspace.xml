@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="306e9007-fde8-4fa3-9393-3d379c29c128" name="Default Changelist" comment="" />
+    <list default="true" id="306e9007-fde8-4fa3-9393-3d379c29c128" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/patch.list" beforeDir="false" afterPath="$PROJECT_DIR$/patch.list" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/init.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/init.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rpc/blockchain.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/rpc/blockchain.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rpc/client.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/rpc/client.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/validation.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/validation.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/validation.h" beforeDir="false" afterPath="$PROJECT_DIR$/src/validation.h" afterDir="false" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -10,6 +17,11 @@
   </component>
   <component name="GOROOT" path="/usr/local/Cellar/go/1.13.5/libexec" />
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="v1.0.1-bds" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="ProjectConfigurationFiles">

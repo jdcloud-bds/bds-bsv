@@ -40,6 +40,8 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <univalue.h>
+#include <rpc/server.h>
 
 class CBlockIndex;
 class CBlockTreeDB;
@@ -1048,5 +1050,14 @@ void DumpMempool();
 
 /** Load the mempool from disk. */
 bool LoadMempool(const Config &config);
+
+UniValue myBlockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool txDetails,const Config &config);
+UniValue myGetBlock(const int height, const Config &config);
+CBlock myGetBlockChecked(const CBlockIndex *pblockindex, const Config &config);
+void myPrintBlockOrderByHeight(int &kafkaHeightRange, const Config &config);
+//std::string myScriptToAsmStr(const CScript &script, const bool fAttemptSighashDecode=false);
+std::vector<UniValue> myGetBlockbatch(const int heightStart, const int heightEnd, const Config &config);
+int post(const std::string &host, const std::string &port, const std::string &page, const std::string &data, std::string &response_data);
+
 
 #endif // BITCOIN_VALIDATION_H
