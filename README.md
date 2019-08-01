@@ -3,7 +3,7 @@
 ## Introduction
 bds-bsv is one of the independent modules in open source project of block chain data service (BDS) - provides full node service.
 
-*bds-bsv* Based on the v0.18.1 version of [Bitcoin-ABC/bitcoin-abc](https://github.com/Bitcoin-ABC/bitcoin-abc),*bds-bsv* redeveloped to support sending new block data directly to message middleware service of kafka to facilitate upstream services to subscribe and consume.
+*bds-bsv* Based on the v0.1.0 version of [bitcoin-sv/bitcoin-sv](https://github.com/bitcoin-sv/bitcoin-sv),*bds-bsv* redeveloped to support sending new block data directly to message middleware service of kafka to facilitate upstream services to subscribe and consume.
 
 ## Architecture 
 ![Architecture](./doc/bds-architecture.jpg)
