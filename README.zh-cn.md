@@ -71,7 +71,7 @@ bds-bsv 是开源项目区块链数据服务（BDS）的其中一个独立模块
 2. sendblock 和 sendbatchblock 是新添加的两个 RPC 接口，用于触发全节点发送特定块的数据。
 
 ### 源代码修改历史记录
-[bds-btc](./CHANGE_HISTORY.md)
+[bds-bsv](./CHANGE_HISTORY.md)
 
 ## 贡献
 [贡献指南](./CONTRIBUTING.md)
