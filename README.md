@@ -1,41 +1,85 @@
-Bitcoin SV
-===========
+# bds-bsv 
+![logo](./doc/bds-logo.png)
+## Introduction
+bds-bsv is one of the independent modules in open source project of block chain data service (BDS) - provides full node service.
 
-What is Bitcoin SV?
--------------------
+*bds-bsv* Based on the v1.0.2 version of [bitcoin-sv/bitcoin-sv](https://github.com/bitcoin-sv/bitcoin-sv),*bds-bsv* redeveloped to support sending new block data directly to message middleware service of kafka to facilitate upstream services to subscribe and consume.
 
-[Bitcoin SV (Satoshi Vision)](https://bitcoinsv.io/) is the original Bitcoin.  It restores the original Bitcoin 
-protocol, will keep it stable, and allow it to massively scale.  Bitcoin SV will maintain the vision set out by Satoshi 
-Nakamoto’s white paper in 2008.  This Github repository provides open-source software to enable use of Bitcoin SV.
+## Architecture 
+![Architecture](./doc/bds-architecture.jpg)
 
-License
--------
+## Environmental Deployment
+### Install BSV 
+#### Environment Initialization
+[build-unix](./doc/build-unix.md)
 
-Bitcoin SV is released under the terms of the Open BSV license. See [LICENSE](LICENSE) for more information.
+#### Install steps
 
-Security
---------
-Security is core to our values, and we value the input of security researchers acting in good faith to help us maintain 
-high standards of security and privacy for our users and the Bitcoin SV blockchain.
+1. Compile
 
-To encourage ethical and responsible research into security vulnerabilities, the Bitcoin SV team, with support from 
-Coingeek Mining, has instituted a [Responsible Disclosure Policy](doc/rdp.md).
+ ```
+   ./autogen.sh
+   ./configure
+   make
+   make install # optional
+ ```
 
-Development Process
--------------------
+2. Run full node and support sending messages to Kafka
 
-This Github repository contains the source code of releases.
+```
+    # log file position: <data_dir>/debug.log
 
-At this early stage in Bitcoin SV's development, we are not accepting contributions to the project. We expect this to 
-change in the future.
+   /usr/local/bin/bitcoind -kafka -kafkaproxyhost=<kafka proxy host> -kafkaproxyport=<kafka proxy port，default 8082> -kafkatopic=bsv -datadir=<data directory> -rpcuser=<user> -rpcpassword=<password>
+```
 
-Contacting the Bitcoin SV Team
-------------------------------
+### Install confluent and kafka
+#### Install kafka
+See [kafka](https://kafka.apache.org/quickstart)
 
-If you want to report a non-confidential issue with Bitcoin SV, please use the 
-[GitHub issue system](https://github.com/bitcoin-sv/bitcoin-sv/issues).
+##### Modify config/server.properties 
 
-If you want to report a security vulnerability, please review the [Responsible Disclosure Policy](doc/rdp.md) and send
-e-mail to <security@bitcoinsv.io>.
+* message.max.bytes=1048576000
 
-For any other questions or issues, please send e-mail to <support@bitcoinsv.io>.
+#### Install confluent 
+see [confluent](https://docs.confluent.io/current/installation/installing_cp/zip-tar.html#prod-kafka-cli-install)
+
+Unzip the confluent package and run Confluent REST Proxy
+
+##### Modify  <path-to-confluent>/etc/kafka-rest/kafka-rest.properties 
+
+* max.request.size = 1048576000
+* buffer.memory = 1048576000
+* send.buffer.bytes = 1048576000
+
+### Install BDS 
+See [BDS](https://github.com/jdcloud-bds/bds)
+
+### Database
+Database we now support SQL Server, PostgreSQL, you can choose one as a data storage method.
+
+#### SQL Server
+Buy [JCS For SQL Server](https://www.jdcloud.com/cn/products/jcs-for-sql-server)
+
+#### PostgreSQL 
+Buy [JCS For PostgreSQL](https://www.jdcloud.com/cn/products/jcs-for-postgresql)
+
+### Install Grafana 
+See [Grafana Official](https://grafana.com/)
+
+## New funtion 
+
+1. The new function of sending messages to Kafka is added（every time a new block is synchronized by full node, the data of the block is sent to kafka and the data structure is customized).
+2. Sendblock and sendbatchblock are newly added as RPC interfaces to trigger full node to send data for a specific block.
+
+### Source Code Change History
+[bds-bsv](./CHANGE_HISTORY.md)
+
+## Contributing
+[Contributing guide](./CONTRIBUTING.md)
+
+## License
+[Apache License 2.0](./LICENSE)
+
+## Project Demonstration
+[Blockchain Data Service](https://bds.jdcloud.com/)
+
